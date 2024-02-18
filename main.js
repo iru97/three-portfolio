@@ -19,11 +19,11 @@ gui.add(world.plane, 'height', 1, 20).
     onChange(() => {
         generatePlane();
     }); 
-gui.add(world.plane, 'widthSegments', 1, 20).
+gui.add(world.plane, 'widthSegments', 1, 50).
     onChange(() => {
         generatePlane();
     }); 
-gui.add(world.plane, 'heightSegments', 1, 20).
+gui.add(world.plane, 'heightSegments', 1, 50).
     onChange(() => {
         generatePlane();
     }); 
@@ -86,7 +86,13 @@ function animate() {
 
 function generatePlane() {
     planeMesh.geometry.dispose();
-    planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height, 10, 10)
+    planeMesh.geometry = new THREE.PlaneGeometry(
+        world.plane.width,
+        world.plane.height,
+        world.plane.widthSegments,
+        world.plane.heightSegments
+    );
+
     setVerticesPosition();
 }
 
