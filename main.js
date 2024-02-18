@@ -3,7 +3,7 @@ import * as dat from 'dat.gui';
 import gsap from 'gsap';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const INITIAL_PLANE_COLORS = { r: 0, g: 0.19, b: 0.4 };
+const INITIAL_PLANE_COLORS = { r: 0, g: 0.19, b: 0.6 };
 const HOVER_PLANE_COLORS = { r: 0.1, g: 0.5, b: 1 };
 
 const raycaster = new THREE.Raycaster();
@@ -14,16 +14,19 @@ const renderer = new THREE.WebGLRenderer();
 const gui = new dat.GUI();
 const world = {
     plane: {
-        width: 10,
-        height: 10,
-        widthSegments: 10,
-        heightSegments: 10
+        width: 400,
+        height: 400,
+        widthSegments: 50,
+        heightSegments: 50
     }
 };
 
 const planeGeometry = new THREE
     .PlaneGeometry(
-        10, 10, 10, 10
+        world.plane.width,
+        world.plane.height,
+        world.plane.widthSegments,
+        world.plane.heightSegments,
     );
 
 const planeMaterial = new THREE
@@ -50,27 +53,27 @@ let mouse = {
     y: undefined
 };
 
-gui.add(world.plane, 'width', 1, 20).
+gui.add(world.plane, 'width', 1, 500).
     onChange(() => {
         generatePlane();
     }); 
-gui.add(world.plane, 'height', 1, 20).
+gui.add(world.plane, 'height', 1, 500).
     onChange(() => {
         generatePlane();
     }); 
-gui.add(world.plane, 'widthSegments', 1, 50).
+gui.add(world.plane, 'widthSegments', 1, 100).
     onChange(() => {
         generatePlane();
     }); 
-gui.add(world.plane, 'heightSegments', 1, 50).
+gui.add(world.plane, 'heightSegments', 1, 100).
     onChange(() => {
         generatePlane();
     });
 
 camera.aspect = window.innerWidth / window.innerHeight;
-camera.position.z = 5;
+camera.position.z = 50;
 
-light.position.set(0, 0, 1);
+light.position.set(0, 1, 1);
 backLight.position.set(0, 0, -1);
 
     /* The code snippet `for (let i = 0; i < planeMesh.geometry.attributes.position.count; i++) {
@@ -105,16 +108,29 @@ ensuring that the rendering output is displayed correctly on devices with differ
 such as high-DPI displays. */
 renderer.setPixelRatio(devicePixelRatio);
 document.body.appendChild(renderer.domElement);
+let frame = 0;
 animate();
 
 /**
  * The `animate` function uses `requestAnimationFrame` to continuously render the scene with the camera
  * and potentially update the rotation of a plane mesh.
  */
+
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
     raycaster.setFromCamera(mouse, camera);
+    frame += 0.01;
+    const { array, originalPosition, randomValues } = planeMesh.geometry.attributes.position;
+    for (let i = 0; i < array.length; i += 3) {
+        // x
+        array[i] = originalPosition[i] + Math.cos(frame + randomValues[i]) * 0.01
+        // y
+        array[i + 1] = originalPosition[i + 1] + Math.sin(frame + randomValues[i]) * 0.01
+        
+        planeMesh.geometry.attributes.position.needsUpdate = true;
+    }
+
     const intersects = raycaster.intersectObject(planeMesh);
    
     if (intersects.length > 0) {
@@ -158,14 +174,21 @@ function setVerticesPosition() {
     (`planeMesh`) and modifying the z-coordinate of each vertex by adding a random value to it. Here's a
     breakdown of what it's doing: */
     const { array: planeMeshPositions } = planeMesh.geometry.attributes.position;
-    for (let i = 0; i < planeMeshPositions.length; i+= 3) {
-        const x = planeMeshPositions[i];
-        const y = planeMeshPositions[i + 1];
-        const z = planeMeshPositions[i + 2 ];
+    const randomValues = [];
+    for (let i = 0; i < planeMeshPositions.length; i++) {
+        if(i % 3 === 0) {
+            const x = planeMeshPositions[i];
+            const y = planeMeshPositions[i + 1];
+            const z = planeMeshPositions[i + 2 ];
 
-        planeMeshPositions[i + 2] = z + Math.random()
-        
+            planeMeshPositions[i] = x + (Math.random() - 0.5) * 3;
+            planeMeshPositions[i + 1] = y + (Math.random() - 0.5) * 3;
+            planeMeshPositions[i + 2] = z + (Math.random() - 0.5) * 3;
+        }
+       randomValues.push(Math.random() * Math.PI * 2)
     }
+    planeMesh.geometry.attributes.position.originalPosition = planeMesh.geometry.attributes.position.array;
+    planeMesh.geometry.attributes.position.randomValues = randomValues;
 }
 
 function setVerticesColor(intersect, colors) {
