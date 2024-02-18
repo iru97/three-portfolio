@@ -1,7 +1,16 @@
 import * as THREE from 'three';
 import * as dat from 'dat.gui';
+import gsap from 'gsap';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+const INITIAL_PLANE_COLORS = { r: 0, g: 0.19, b: 0.4 };
+const HOVER_PLANE_COLORS = { r: 0.1, g: 0.5, b: 1 };
+
+const raycaster = new THREE.Raycaster();
+const scene = new THREE.Scene();
+const camera = new THREE
+    .PerspectiveCamera(75, innerWidth/ innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
 const gui = new dat.GUI();
 const world = {
     plane: {
@@ -11,6 +20,36 @@ const world = {
         heightSegments: 10
     }
 };
+
+const planeGeometry = new THREE
+    .PlaneGeometry(
+        10, 10, 10, 10
+    );
+
+const planeMaterial = new THREE
+    .MeshPhongMaterial({
+        side: THREE.DoubleSide,
+        flatShading: true,
+        vertexColors: true
+    });
+
+const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+
+const light = new THREE.DirectionalLight(
+    0xffffff, 1
+);
+
+const backLight = new THREE.DirectionalLight(
+    0xffffff, 1
+);
+
+const controls = new OrbitControls( camera, renderer.domElement );
+
+let mouse = {
+    x: undefined,
+    y: undefined
+};
+
 gui.add(world.plane, 'width', 1, 20).
     onChange(() => {
         generatePlane();
@@ -26,12 +65,37 @@ gui.add(world.plane, 'widthSegments', 1, 50).
 gui.add(world.plane, 'heightSegments', 1, 50).
     onChange(() => {
         generatePlane();
-    }); 
+    });
 
-const scene = new THREE.Scene();
-const camera = new THREE
-    .PerspectiveCamera(75, innerWidth/ innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer();
+camera.aspect = window.innerWidth / window.innerHeight;
+camera.position.z = 5;
+
+light.position.set(0, 0, 1);
+backLight.position.set(0, 0, -1);
+
+    /* The code snippet `for (let i = 0; i < planeMesh.geometry.attributes.position.count; i++) {
+        colors.push(0, 0, 1);
+    }` is iterating over the positions of vertices in the geometry of a plane mesh (`planeMesh`) and
+    pushing color values into an array named `colors`. */
+    const colors = [];
+    for (let i = 0; i < planeMesh.geometry.attributes.position.count; i++) {
+        colors.push(
+            INITIAL_PLANE_COLORS.r,
+            INITIAL_PLANE_COLORS.g,
+            INITIAL_PLANE_COLORS.b
+        );
+    }
+
+    planeMesh.geometry.setAttribute('color',
+        new THREE.BufferAttribute(new Float32Array(colors), 3)
+    );
+setVerticesPosition();
+
+scene.add(planeMesh);
+scene.add(light);
+scene.add(backLight);
+
+controls.update();
 
 renderer.setSize(innerWidth, innerHeight);
 
@@ -40,39 +104,8 @@ setting the pixel ratio of the renderer to match the device pixel ratio. This is
 ensuring that the rendering output is displayed correctly on devices with different pixel densities,
 such as high-DPI displays. */
 renderer.setPixelRatio(devicePixelRatio);
-
-camera.aspect = window.innerWidth / window.innerHeight;
-
-const controls = new OrbitControls( camera, renderer.domElement );
-
 document.body.appendChild(renderer.domElement);
-camera.position.z = 5;
-
-const planeGeometry = new THREE
-    .PlaneGeometry(
-        10, 10, 10, 10
-    );
-const planeMaterial = new THREE
-    .MeshPhongMaterial({
-        color: 0x6495ED,
-        side: THREE.DoubleSide,
-        flatShading: true
-    });
-const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial)
-
-scene.add(planeMesh);
-
-setVerticesPosition();
-
-const light = new THREE.DirectionalLight(
-    0xffffff, 1
-);
-light.position.set(0, 0, 1);
-scene.add(light);
-/* const ambientLight = new THREE.AmbientLight(
-    0xffffff, 1
-); */
-controls.update();
+animate();
 
 /**
  * The `animate` function uses `requestAnimationFrame` to continuously render the scene with the camera
@@ -81,7 +114,20 @@ controls.update();
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
-    //planeMesh.rotation.x += 0.01;
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(planeMesh);
+   
+    if (intersects.length > 0) {
+        const hover = {...HOVER_PLANE_COLORS};
+        setVerticesColor(intersects[0], HOVER_PLANE_COLORS);
+       gsap.to(hover, {
+        ...INITIAL_PLANE_COLORS,
+        duration: 1,
+        onUpdate: () => {
+            setVerticesColor(intersects[0], hover)
+        }
+       })
+    }
 }
 
 function generatePlane() {
@@ -92,7 +138,18 @@ function generatePlane() {
         world.plane.widthSegments,
         world.plane.heightSegments
     );
+    const colors = [];
+    for (let i = 0; i < planeMesh.geometry.attributes.position.count; i++) {
+        colors.push(
+            INITIAL_PLANE_COLORS.r,
+            INITIAL_PLANE_COLORS.g,
+            INITIAL_PLANE_COLORS.b
+        );
+    }
 
+    planeMesh.geometry.setAttribute('color',
+        new THREE.BufferAttribute(new Float32Array(colors), 3)
+    );
     setVerticesPosition();
 }
 
@@ -111,6 +168,23 @@ function setVerticesPosition() {
     }
 }
 
+function setVerticesColor(intersect, colors) {
+    const { color } =   intersect.object.geometry.attributes;
+    color.setX(intersect.face.a, colors.r);
+    color.setY(intersect.face.a, colors.g);
+    color.setZ(intersect.face.a, colors.b);
+
+    color.setX(intersect.face.b, colors.r);
+    color.setY(intersect.face.b, colors.g);
+    color.setZ(intersect.face.b, colors.b);
+
+    color.setX(intersect.face.c, colors.r);
+    color.setY(intersect.face.c, colors.g);
+    color.setZ(intersect.face.c, colors.b);
+
+    color.needsUpdate = true;
+}
+
 /**
  * The function `onWindowResize` adjusts the camera aspect ratio, updates the projection matrix,
  * resizes the renderer, sets the pixel ratio, and updates the controls.
@@ -125,7 +199,22 @@ function onWindowResize() {
 	animate()
 }
 
-window.addEventListener('resize', onWindowResize, false);
+/**
+ * The function `normalizeMouseCoords` normalizes mouse coordinates to a range of -1 to 1 based on the
+ * window dimensions.
+ * @returns The function `normalizeMouseCoords` takes an object with `x` and `y` properties as its
+ * argument. It then normalizes the mouse coordinates based on the inner width and inner height of the
+ * window, and returns an object with normalized `x` and `y` values.
+ */
+function normalizeMouseCoords({x, y}) {
+    return {
+        x: (x / innerWidth) * 2 - 1,
+        y: -(y / innerHeight) * 2 + 1
+    }
+}
 
-animate();
+window.addEventListener('resize', onWindowResize, false);
+window.addEventListener('mousemove', (event) => {
+    mouse = normalizeMouseCoords({x: event.clientX, y: event.clientY});
+});
 /* console.log(scene, camera, renderer) */
