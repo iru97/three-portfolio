@@ -74,7 +74,7 @@ camera.aspect = window.innerWidth / window.innerHeight;
 camera.position.z = 50;
 
 light.position.set(0, 1, 1);
-backLight.position.set(0, 0, -1);
+backLight.position.set(0, 1, -1);
 
     /* The code snippet `for (let i = 0; i < planeMesh.geometry.attributes.position.count; i++) {
         colors.push(0, 0, 1);
